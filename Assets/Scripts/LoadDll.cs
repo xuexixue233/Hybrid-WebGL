@@ -8,12 +8,15 @@ using System.Reflection;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
+using LitJson;
 
 public class LoadDll : MonoBehaviour
 {
     private static Dictionary<string, byte[]> s_assetDatas = new Dictionary<string, byte[]>();
     
     private static Assembly _hotUpdateAss;
+    
+    private string url = "http://101.37.20.94/StreamingAssets/File.json";
     
     void Start()
     {
@@ -30,23 +33,12 @@ public class LoadDll : MonoBehaviour
 #else
         _hotUpdateAss = System.AppDomain.CurrentDomain.GetAssemblies().First(a => a.GetName().Name == "HotUpdate");
 #endif
-    
-        Type type = _hotUpdateAss.GetType("Hello");
-        type.GetMethod("Run").Invoke(null, null);
-
-        RunMain();
+        
     }
     
     public static byte[] ReadBytesFromStreamingAssets(string dllName)
     {
         return s_assetDatas[dllName];
-    }
-
-    private static void RunMain()
-    {
-        AssetBundle ab = AssetBundle.LoadFromMemory(ReadBytesFromStreamingAssets("prefab"));
-        GameObject go = ab.LoadAsset<GameObject>("Canvas");
-        GameObject.Instantiate(go);
     }
 
     private static void LoadMetadataForAOTAssemblies()
@@ -83,33 +75,71 @@ public class LoadDll : MonoBehaviour
             "prefab",
             "HotUpdate.dll.bytes",
         }.Concat(AOTMetaAssemblyFiles);
+        
+        UnityWebRequest webRequest = UnityWebRequest.Get(url);
+        UnityWebRequest localRequest = UnityWebRequest.Get(GetWebRequestPath("File.json"));
 
-        foreach (var asset in assets)
+        yield return webRequest.SendWebRequest();
+        yield return localRequest.SendWebRequest();
+
+        if (webRequest.result != UnityWebRequest.Result.Success)
         {
-            string dllPath = GetWebRequestPath(asset);
-            Debug.Log($"start download asset:{dllPath}");
-            UnityWebRequest www = UnityWebRequest.Get(dllPath);
-            yield return www.SendWebRequest();
-
-#if UNITY_2020_1_OR_NEWER
-            if (www.result != UnityWebRequest.Result.Success)
+            Debug.Log("Error downloading file: " + webRequest.error);
+        }
+        else
+        {
+            string fileContent = webRequest.downloadHandler.text;
+            string localFileContent = localRequest.downloadHandler.text;
+            // 在这里你可以处理文件内容，比如解析文本或执行其他操作
+            var fileMd5 = JsonMapper.ToObject<FileMD5>(fileContent);
+            var localMD5=JsonMapper.ToObject<FileMD5>(localFileContent);
+            if (fileMd5.versions==localMD5.versions)
             {
-                Debug.Log(www.error);
+                foreach (var asset in assets)
+                {
+                    string dllPath = GetWebRequestPath(asset);
+                    Debug.Log($"start download asset:{dllPath}");
+                    UnityWebRequest www = UnityWebRequest.Get(dllPath);
+                    yield return www.SendWebRequest();
+            
+                    if (www.result != UnityWebRequest.Result.Success)
+                    {
+                        Debug.Log(www.error);
+                    }
+                    else
+                    {
+                        // Or retrieve results as binary data
+                        byte[] assetData = www.downloadHandler.data;
+                        Debug.Log($"dll:{asset}  size:{assetData.Length}");
+                        s_assetDatas[asset] = assetData;
+                    }
+                }
+                
             }
-#else
-            if (www.isHttpError || www.isNetworkError)
-            {
-                Debug.Log(www.error);
-            }
-#endif
             else
             {
-                // Or retrieve results as binary data
-                byte[] assetData = www.downloadHandler.data;
-                Debug.Log($"dll:{asset}  size:{assetData.Length}");
-                s_assetDatas[asset] = assetData;
+                foreach (var asset in assets)
+                {
+                    string dllPath = GetWebRequestPath($"http://101.37.20.94/StreamingAssets/{asset}");
+                    Debug.Log($"start download asset:{dllPath}");
+                    UnityWebRequest www = UnityWebRequest.Get(dllPath);
+                    yield return www.SendWebRequest();
+            
+                    if (www.result != UnityWebRequest.Result.Success)
+                    {
+                        Debug.Log(www.error);
+                    }
+                    else
+                    {
+                        // Or retrieve results as binary data
+                        byte[] assetData = www.downloadHandler.data;
+                        Debug.Log($"dll:{asset}  size:{assetData.Length}");
+                        s_assetDatas[asset] = assetData;
+                    }
+                }
             }
         }
+        
 
         onDownloadComplete();
     }
