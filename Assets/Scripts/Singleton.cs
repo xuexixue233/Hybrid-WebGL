@@ -43,7 +43,7 @@ public class Singleton<T> : MonoBehaviour where T : MonoBehaviour
     public virtual void Awake()
     {
         if (Instance == null)
-            Instance = _instance;
+            Instance = this as T;
         else if (Instance != this) //Check to make sure there isn't already an instance of this class.
         {
             //If there is already an instance of this class, destroy the object we just created.
@@ -52,6 +52,8 @@ public class Singleton<T> : MonoBehaviour where T : MonoBehaviour
                              "\nIf you would like more than one instance, ensure that the class you have written does not Inherit from a Singleton class.");
             Dispose();
         }
+
+        DontDestroyOnLoad(this);
     }
 
     // Proper cleanup of a Singleton instance includes nullifying any references to it in order to allow Garbage Collection

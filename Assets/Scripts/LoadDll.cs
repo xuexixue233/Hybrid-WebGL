@@ -10,7 +10,7 @@ using UnityEngine;
 using UnityEngine.Networking;
 using LitJson;
 
-public class LoadDll : MonoBehaviour
+public class LoadDll : Singleton<LoadDll>
 {
     private static Dictionary<string, byte[]> s_assetDatas = new Dictionary<string, byte[]>();
     
@@ -35,8 +35,8 @@ public class LoadDll : MonoBehaviour
 #endif
         
     }
-    
-    public static byte[] ReadBytesFromStreamingAssets(string dllName)
+
+    private static byte[] ReadBytesFromStreamingAssets(string dllName)
     {
         return s_assetDatas[dllName];
     }
@@ -67,7 +67,8 @@ public class LoadDll : MonoBehaviour
 
     };
 
-    IEnumerator DownLoadAssets(Action onDownloadComplete)
+
+    private IEnumerator DownLoadAssets(Action onDownloadComplete)
     {
         var assets = new List<string>
         {
@@ -114,7 +115,6 @@ public class LoadDll : MonoBehaviour
                         s_assetDatas[asset] = assetData;
                     }
                 }
-                
             }
             else
             {
