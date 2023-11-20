@@ -78,10 +78,25 @@ public class LoadDll : Singleton<LoadDll>
         }.Concat(AOTMetaAssemblyFiles);
         
         UnityWebRequest webRequest = UnityWebRequest.Get(url);
-        UnityWebRequest localRequest = UnityWebRequest.Get(GetWebRequestPath("File.json"));
 
         yield return webRequest.SendWebRequest();
-        yield return localRequest.SendWebRequest();
+
+        if (webRequest.result != UnityWebRequest.Result.Success)
+        {
+            Debug.Log("Error downloading file: " + webRequest.error);
+        }
+
+        if (!File.Exists(Application.persistentDataPath+"/File.json"))
+        {
+            //TODO:热更新包全部加载
+            string fileContent = webRequest.downloadHandler.text;
+            File.WriteAllText(Application.persistentDataPath + "/File.json", fileContent);
+            
+        }
+        else
+        {
+            //TODO:根据配置文件加载热更新包
+        }
 
         if (webRequest.result != UnityWebRequest.Result.Success)
         {
@@ -90,33 +105,8 @@ public class LoadDll : Singleton<LoadDll>
         else
         {
             string fileContent = webRequest.downloadHandler.text;
-            string localFileContent = localRequest.downloadHandler.text;
             // 在这里你可以处理文件内容，比如解析文本或执行其他操作
             var fileMd5 = JsonMapper.ToObject<FileMD5>(fileContent);
-            var localMD5=JsonMapper.ToObject<FileMD5>(localFileContent);
-            if (fileMd5.versions==localMD5.versions)
-            {
-                foreach (var asset in assets)
-                {
-                    string dllPath = GetWebRequestPath(asset);
-                    Debug.Log($"start download asset:{dllPath}");
-                    UnityWebRequest www = UnityWebRequest.Get(dllPath);
-                    yield return www.SendWebRequest();
-            
-                    if (www.result != UnityWebRequest.Result.Success)
-                    {
-                        Debug.Log(www.error);
-                    }
-                    else
-                    {
-                        // Or retrieve results as binary data
-                        byte[] assetData = www.downloadHandler.data;
-                        Debug.Log($"dll:{asset}  size:{assetData.Length}");
-                        s_assetDatas[asset] = assetData;
-                    }
-                }
-            }
-            else
             {
                 foreach (var asset in assets)
                 {
