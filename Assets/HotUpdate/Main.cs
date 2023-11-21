@@ -11,7 +11,7 @@ public class Main : MonoBehaviour
 
     private void Awake()
     {
-        timeText.color=Color.black;
+        timeText.color=Color.red;
     }
 
     private void Update()
