@@ -13,7 +13,9 @@ namespace Editor
 {
     public class SaveFileMD5 : ScriptableWizard
     {
+        public string versions;
         public List<DefaultAsset> assetBundles=new List<DefaultAsset>();
+        public List<DefaultAsset> assetDLLs = new List<DefaultAsset>();
 
         [MenuItem("FileMD5/Generate")]
         public static void GenerateFileMD5()
@@ -25,6 +27,7 @@ namespace Editor
         {
             var fileMd5 = new FileMD5();
             var stringBuilder = new StringBuilder();
+            fileMd5.versions = versions;
             foreach (var path in assetBundles)
             {
                 var ab = new FileStream(Application.streamingAssetsPath + $"/{path.name}",FileMode.Open);
@@ -35,14 +38,22 @@ namespace Editor
                 {
                     stringBuilder.Append(t.ToString("X"));
                 }
-
-                var md5Info = new FileMD5Info
+                
+                fileMd5.fileMD5Infos.Add(path.name,stringBuilder.ToString());
+            }
+            foreach (var path in assetDLLs)
+            {
+                var ab = new FileStream(Application.streamingAssetsPath + $"/{path.name}.bytes",FileMode.Open);
+                MD5 md5 = new MD5CryptoServiceProvider();
+                var retVal = md5.ComputeHash(ab);
+                ab.Close();
+                foreach (var t in retVal)
                 {
-                    fileName = path.name,
-                    fileMd5 = stringBuilder.ToString()
-                };
-                fileMd5.fileMD5Infos.Add(md5Info);
-            }                                     
+                    stringBuilder.Append(t.ToString("X"));
+                }
+                
+                fileMd5.fileMD5Infos.Add(path.name,stringBuilder.ToString());
+            }
 
             var str = JsonMapper.ToJson(fileMd5);
             File.WriteAllText(Application.streamingAssetsPath + "/File.json",str);
