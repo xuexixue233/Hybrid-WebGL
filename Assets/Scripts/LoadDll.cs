@@ -13,11 +13,11 @@ using LitJson;
 public class LoadDll : Singleton<LoadDll>
 {
     private static Dictionary<string, byte[]> s_assetDatas = new Dictionary<string, byte[]>();
-    
+
     private static Assembly _hotUpdateAss;
-    
+
     private string url = $"{Application.streamingAssetsPath}/File.json";
-    
+
     void Start()
     {
         StartCoroutine(DownLoadAssets(this.StartGame));
@@ -35,7 +35,7 @@ public class LoadDll : Singleton<LoadDll>
 #endif
         RunMain();
     }
-    
+
     private static void RunMain()
     {
         AssetBundle ab = AssetBundle.LoadFromMemory(ReadBytesFromStreamingAssets("prefab"));
@@ -59,9 +59,9 @@ public class LoadDll : Singleton<LoadDll>
             Debug.Log($"LoadMetadataForAOTAssembly:{aotDllName}. mode:{mode} ret:{err}");
         }
     }
+
     private static List<string> AOTMetaAssemblyFiles { get; } = new List<string>()
     {
-
     };
 
 
@@ -73,7 +73,7 @@ public class LoadDll : Singleton<LoadDll>
             "prefab",
             "HotUpdate.dll.bytes",
         }.Concat(AOTMetaAssemblyFiles);
-        
+
         UnityWebRequest webRequest = UnityWebRequest.Get(url);
 
         yield return webRequest.SendWebRequest();
@@ -82,109 +82,23 @@ public class LoadDll : Singleton<LoadDll>
         {
             Debug.Log("Error downloading file: " + webRequest.error);
         }
+        
+        foreach (var asset in assets)
+        {
+            string dllPath = $"{Application.streamingAssetsPath}/{asset}";
+            Debug.Log($"start download asset:{dllPath}");
+            UnityWebRequest www = UnityWebRequest.Get(dllPath);
+            yield return www.SendWebRequest();
 
-        if (!File.Exists(Application.persistentDataPath+"/File.json"))
-        {
-            //TODO:热更新包全部加载
-            string fileContent = webRequest.downloadHandler.text;
-            File.WriteAllText(Application.persistentDataPath + "/File.json", fileContent);
-            foreach (var asset in assets)
+            if (www.result != UnityWebRequest.Result.Success)
             {
-                string dllPath = $"{Application.streamingAssetsPath}/{asset}";
-                Debug.Log($"start download asset:{dllPath}");
-                UnityWebRequest www = UnityWebRequest.Get(dllPath);
-                yield return www.SendWebRequest();
-            
-                if (www.result != UnityWebRequest.Result.Success)
-                {
-                    Debug.Log(www.error);
-                }
-                else
-                {
-                    byte[] assetData = www.downloadHandler.data;
-                    Debug.Log($"dll:{asset}  size:{assetData.Length}");
-                    s_assetDatas[asset] = assetData;
-                    File.WriteAllBytes(Application.persistentDataPath +$"/{asset}",assetData);
-                }
-            }
-        }
-        else
-        {
-            //TODO:根据配置文件加载热更新包
-            string fileContent = webRequest.downloadHandler.text;
-            string localFile = File.ReadAllText(Application.persistentDataPath + "/File.json");
-            FileMD5 fileMD5 = JsonMapper.ToObject<FileMD5>(fileContent);
-            FileMD5 localMD5 = JsonMapper.ToObject<FileMD5>(localFile);
-            if (fileMD5.versions!=localMD5.versions)
-            {
-                //加载包
-                foreach (var (key, value) in fileMD5.fileMD5Infos)
-                {
-                    if (localMD5.fileMD5Infos.TryGetValue(key,out var localValue))
-                    {
-                        if (value!=localValue)
-                        {
-                            //覆盖包
-                            var dllPath = $"{Application.streamingAssetsPath}/{key}";
-                            Debug.Log($"start download asset:{dllPath}");
-                            UnityWebRequest www = UnityWebRequest.Get(dllPath);
-                            yield return www.SendWebRequest();
-            
-                            if (www.result != UnityWebRequest.Result.Success)
-                            {
-                                Debug.Log(www.error);
-                            }
-                            else
-                            {
-                                byte[] assetData = www.downloadHandler.data;
-                                Debug.Log($"dll:{key}  size:{assetData.Length}");
-                                s_assetDatas[key] = assetData;
-                                File.WriteAllBytes(Application.persistentDataPath +$"/{key}",assetData);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        //增加包
-                        var dllPath = $"{Application.streamingAssetsPath}/{key}";
-                        Debug.Log($"start download asset:{dllPath}");
-                        UnityWebRequest www = UnityWebRequest.Get(dllPath);
-                        yield return www.SendWebRequest();
-            
-                        if (www.result != UnityWebRequest.Result.Success)
-                        {
-                            Debug.Log(www.error);
-                        }
-                        else
-                        {
-                            byte[] assetData = www.downloadHandler.data;
-                            Debug.Log($"dll:{key}  size:{assetData.Length}");
-                            s_assetDatas[key] = assetData;
-                            File.WriteAllBytes(Application.persistentDataPath +$"/{key}",assetData);
-                        }
-                    }
-                }
+                Debug.Log(www.error);
             }
             else
             {
-                foreach (var asset in assets)
-                {
-                    string dllPath = $"{Application.persistentDataPath}/{asset}";
-                    Debug.Log($"start download asset:{dllPath}");
-                    UnityWebRequest www = UnityWebRequest.Get(dllPath);
-                    yield return www.SendWebRequest();
-            
-                    if (www.result != UnityWebRequest.Result.Success)
-                    {
-                        Debug.Log(www.error);
-                    }
-                    else
-                    {
-                        byte[] assetData = www.downloadHandler.data;
-                        Debug.Log($"dll:{asset}  size:{assetData.Length}");
-                        s_assetDatas[asset] = assetData;
-                    }
-                }
+                byte[] assetData = www.downloadHandler.data;
+                Debug.Log($"dll:{asset}  size:{assetData.Length}");
+                s_assetDatas[asset] = assetData;
             }
         }
 
